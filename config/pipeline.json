@@ -1,0 +1,27 @@
+{
+  "chunk_size": 1000,
+  "chunk_overlap": 50,
+  "min_chunk_length": 20,
+  "max_chunk_tokens": 6000,
+  "include_auxiliary": true,
+  "skip_sections": [
+    "see also",
+    "references",
+    "external links",
+    "further reading",
+    "notes",
+    "bibliography"
+  ],
+  "batch_size": 100,
+  "num_workers": 4,
+  "embedding_batch_size": 16,
+  "embedding_parallel_workers": 3,
+  "embedding_timeout": 120,
+  "embedding_max_retries": 5,
+  "batch_delay_seconds": 1,
+  "max_bulk_bytes": 12582912,
+  "bulk_request_timeout": 60,
+  "bulk_max_retries": 5,
+  "bulk_parallel_workers": 4,
+  "max_doc_id_bytes": 512
+}

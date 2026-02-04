@@ -1,0 +1,44 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 4,
+      "number_of_replicas": 0,
+      "knn": true,
+      "knn.algo_param.ef_search": 100,
+      "similarity": {
+        "default": { "type": "BM25" }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "article_id": { "type": "keyword" },
+      "article_title": { "type": "text", "analyzer": "standard" },
+      "article_hash": { "type": "keyword" },
+      "timestamp": { "type": "date" },
+      "total_chunks": { "type": "integer" },
+      "chunks": {
+        "type": "nested",
+        "properties": {
+          "chunk_index": { "type": "integer" },
+          "section_path": { "type": "text" },
+          "content": { "type": "text", "analyzer": "standard" },
+          "char_count": { "type": "integer" },
+          "vector": {
+            "type": "knn_vector",
+            "dimension": 1536,
+            "method": {
+              "name": "hnsw",
+              "space_type": "cosinesimil",
+              "engine": "faiss",
+              "parameters": {
+                "ef_construction": 128,
+                "m": 24
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
