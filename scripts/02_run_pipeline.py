@@ -71,7 +71,11 @@ def load_config() -> dict:
     config["azure_endpoint"] = os.environ.get("AZURE_EMBEDDING_ENDPOINT", config.get("azure_endpoint", ""))
     config["azure_api_key"] = os.environ.get("AZURE_EMBEDDING_API_KEY", config.get("azure_api_key", ""))
     config["azure_api_version"] = os.environ.get("AZURE_EMBEDDING_API_VERSION", config.get("azure_api_version", "2024-02-01"))
-    raw_progress = os.environ.get("PROGRESS_FILE") or config.get("progress_file", "output/pipeline_progress_nested.json")
+    index_name = config.get("opensearch_index", "wiki_kb_nested")
+    raw_progress = os.environ.get("PROGRESS_FILE") or config.get("progress_file")
+    if not raw_progress:
+        # Default: output/<INDEX>_pipeline_progress.json (no _nested suffix)
+        raw_progress = f"output/{index_name}_pipeline_progress.json"
     config["progress_file"] = str(REPO_ROOT / raw_progress) if not os.path.isabs(raw_progress) else raw_progress
     config["embedding_provider"] = os.environ.get("EMBEDDING_PROVIDER", config.get("embedding_provider", "azure"))
 

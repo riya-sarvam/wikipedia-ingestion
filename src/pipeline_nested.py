@@ -11,7 +11,7 @@ from typing import List, Dict, Optional
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 
-from .dump_reader import stream_pages, batch_pages
+from .dump_reader import stream_pages_tracked, batch_pages
 from .chunking import parse_sections, clean_text, split_into_chunks
 from .embedding import generate_embeddings
 from .opensearch_client import push_batch_to_opensearch, load_progress, save_progress
@@ -123,22 +123,43 @@ def run_pipeline_nested(
 
     batch_size = config["batch_size"]
     num_workers = config["num_workers"]
-    progress_file = config.get("progress_file") or "output/pipeline_progress_nested.json"
+    progress_file = config.get("progress_file") or f"output/{index_name}_pipeline_progress.json"
     max_doc_id_bytes = config.get("max_doc_id_bytes", 512)
 
+    resume_file = None
+    resume_skip_pages = 0
     if progress_file and os.path.exists(progress_file):
         prog = load_progress(progress_file)
-        resume_from = prog.get("batches_completed", 0)
-        if resume_from > 0:
-            skip_batches = max(skip_batches or 0, resume_from)
-            if verbose:
-                print(f"Resuming: skip first {skip_batches} batches ({prog.get('pages_processed', 0)} pages, {prog.get('documents_pushed', 0)} docs)")
+        resume_batches = prog.get("batches_completed", 0)
+        if resume_batches > 0:
+            if prog.get("last_stream_file") is not None and prog.get("pages_into_current_file") is not None:
+                resume_file = prog["last_stream_file"]
+                resume_skip_pages = prog.get("pages_into_current_file", 0)
+                skip_batches = 0
+                if verbose:
+                    print(f"Resuming from stream: {resume_file} (skip {resume_skip_pages} pages in file, {resume_batches} batches already done)")
+            else:
+                skip_batches = max(skip_batches or 0, resume_batches)
+                if verbose:
+                    print(f"Resuming: skip first {skip_batches} batches ({prog.get('pages_processed', 0)} pages, {prog.get('documents_pushed', 0)} docs)")
 
     os.makedirs(os.path.dirname(progress_file) or ".", exist_ok=True)
 
     stats = {"total_pages": 0, "total_chunks": 0, "total_documents": 0, "batches_processed": 0, "batches_skipped": 0}
+    if resume_file is not None:
+        stats["initial_batches_completed"] = prog.get("batches_completed", 0)
+        stats["total_pages"] = prog.get("pages_processed", 0)
+        stats["total_documents"] = prog.get("documents_pushed", 0)
     start_time = time.time()
-    page_stream = stream_pages(input_file, max_pages=max_pages)
+
+    stream_state = {}
+    page_stream = stream_pages_tracked(
+        input_file,
+        max_pages=max_pages,
+        state=stream_state,
+        resume_file=resume_file,
+        resume_skip_pages=resume_skip_pages,
+    )
     batched_pages = batch_pages(page_stream, batch_size)
 
     for batch_num, pages_batch in enumerate(batched_pages):
@@ -180,7 +201,7 @@ def run_pipeline_nested(
         stats["total_documents"] += len(documents)
         stats["batches_processed"] += 1
         if progress_file:
-            save_progress(progress_file, stats, batch_num)
+            save_progress(progress_file, stats, batch_num, stream_state=stream_state)
 
         if verbose:
             batch_time = time.time() - batch_start

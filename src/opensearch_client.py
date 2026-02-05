@@ -4,7 +4,7 @@ OpenSearch: AWS IAM auth, bulk push with size splitting and parallel workers.
 import os
 import json
 import requests
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -136,17 +136,28 @@ def load_progress(progress_file: str) -> Dict:
         return {}
 
 
-def save_progress(progress_file: str, stats: Dict, batch_num: int) -> None:
-    """Save progress after each batch."""
+def save_progress(
+    progress_file: str,
+    stats: Dict,
+    batch_num: int,
+    stream_state: Optional[Dict] = None,
+) -> None:
+    """Save progress after each batch. stream_state can include current_file, pages_into_current_file for fast resume."""
     if not progress_file:
         return
     os.makedirs(os.path.dirname(progress_file) or ".", exist_ok=True)
+    base_batches = stats.get("initial_batches_completed", stats.get("batches_skipped", 0))
     data = {
-        "batches_completed": stats.get("batches_skipped", 0) + stats.get("batches_processed", 0),
+        "batches_completed": base_batches + stats.get("batches_processed", 0),
         "pages_processed": stats.get("total_pages", 0),
         "documents_pushed": stats.get("total_documents", 0),
         "last_batch": batch_num + 1,
     }
+    if stream_state:
+        if stream_state.get("current_file"):
+            data["last_stream_file"] = stream_state["current_file"]
+        if stream_state.get("pages_into_current_file") is not None:
+            data["pages_into_current_file"] = stream_state["pages_into_current_file"]
     try:
         with open(progress_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)

@@ -44,7 +44,7 @@ For EC2 or any server: configure `.env` and optionally `config/pipeline.json`, t
    uv run python scripts/02_run_pipeline.py
    ```
    Without uv, use `python scripts/01_create_index.py` and `python scripts/02_run_pipeline.py` after installing deps.
-   Progress is saved to `output/pipeline_progress_nested.json` (or `PROGRESS_FILE`). Re-run to resume from the last batch.
+   Progress is saved to `output/<OPENSEARCH_INDEX>_pipeline_progress.json` unless you set `PROGRESS_FILE` in .env. Re-run to resume from the last batch.
 
 ## Config files
 
@@ -85,6 +85,7 @@ wikipedia-ingestion/
 
 ## Notes
 
-- **Resume:** Delete `output/pipeline_progress_nested.json` to start from scratch; otherwise the pipeline skips already-processed batches.
+- **Resume:** Progress is saved to `output/{OPENSEARCH_INDEX}_pipeline_progress.json` (one file per index). It stores the last stream file and position, so on restart the pipeline continues from that file instead of re-reading from the beginning. Delete the progress file to start from scratch.
 - **Full dump:** Leave `MAX_PAGES` unset to process the entire dump. Expect long runtimes (days) depending on size and API limits.
 - **Embedding limit:** Chunk text is truncated to stay under the Azure token limit (8192); long sections are split by `chunk_size`/overlap in `config/pipeline.json`.
+- **Chunking test:** Run `uv run python scripts/test_chunking.py` to verify section parsing, chunk splitting, and nested doc output.
